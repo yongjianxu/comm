@@ -11,6 +11,7 @@ if hostname in clients:
     for i in range(len(ibdevs)):
         ibdev = ibdevs[i % len(ibdevs)]  # Alternate between mlx5_0 and mlx5_1
         port = ports[i % len(ports)]      # Alternate between ports
+        server = servers[i % len(servers)]
         write = WRITE(ibdev, server_ip='10.10.10.2', port=port)
         write.run()
 elif hostname in servers:
