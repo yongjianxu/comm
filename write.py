@@ -39,6 +39,7 @@ class WRITE:
             '--report_gbits',
             '-F',
             '-D', '10',
+            '-x', '3',
         ]
         # Add server_ip if it exists
         if self.server_ip is not None:
