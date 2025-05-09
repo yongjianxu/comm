@@ -3,7 +3,7 @@ import logging
 import datetime
 
 class WRITE:
-    def __init__(self,ibdev, server_ip=None, port=18515, size=65536, iterations=1000):
+    def __init__(self,ibdev, server_ip=None, port=18515, size=65536, iterations=1000, cuda=None):
         """
         Initialize WRITE class with ib_write_bw parameters
         
@@ -12,12 +12,14 @@ class WRITE:
             port (int): Port number (default: 18515)
             size (int): Message size in bytes (default: 65536)
             iterations (int): Number of iterations (default: 1000)
+            cuda (int, optional): CUDA device number to use (default: None)
         """
         self.ibdev=ibdev
         self.server_ip = server_ip
         self.port = port
         self.size = size
         self.iterations = iterations
+        self.cuda = cuda
         self.logger = logging.getLogger(__name__)
     
     def run(self, **kwargs):
@@ -41,6 +43,11 @@ class WRITE:
             '-D', '10',
             '-x', '3',
         ]
+        
+        # Add CUDA device if specified
+        if self.cuda is not None:
+            cmd.extend(['--use_cuda', str(self.cuda)])
+        
         # Add server_ip if it exists
         if self.server_ip is not None:
             cmd.append(self.server_ip)
