@@ -1,7 +1,6 @@
 import subprocess
 import logging
-import threading
-import sys
+import datetime
 
 class WRITE:
     def __init__(self,ibdev, server_ip=None, port=18515, size=65536, iterations=1000):
@@ -54,31 +53,27 @@ class WRITE:
         
         try:
             self.logger.info(f"Running command: {' '.join(cmd)}")
-            # Run the process the background
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-
-            # Start a thread to monitor the process and print last 5 lines when it exits
-            def monitor_output(process):
-                stdout, stderr = process.communicate()
-                if stdout:
-                    last_lines = stdout.strip().split('\n')[-5:]
-                    print(f"\nLast 5 lines of output from {' '.join(cmd)}:")
-                    for line in last_lines:
-                        print(line)
-                if stderr:
-                    print(f"\nErrors from {' '.join(cmd)}:", file=sys.stderr)
-                    print(stderr, file=sys.stderr)
-                    
-            thread = threading.Thread(target=monitor_output, args=(process,))
-            thread.daemon = True
-            thread.start()
             
-            return process
+            # Create a unique filename based on timestamp and device
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_file = f"ib_write_bw_{self.ibdev}_{timestamp}.log"
+            
+            # Open file to capture output
+            with open(output_file, 'w') as f:
+                f.write(f"Command: {' '.join(cmd)}\n\n")
+                f.flush()
+                
+                # Run the process and redirect output to file
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=f,
+                    stderr=f,
+                    text=True
+                )
+                
+                self.logger.info(f"Writing output to {output_file}")
+                return process
+
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error running ib_write_bw: {e}")
             raise
