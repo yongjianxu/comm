@@ -46,7 +46,7 @@ class WRITE:
         
         # Add CUDA device if specified
         if self.cuda is not None:
-            cmd.extend(['--use_cuda', str(self.cuda)])
+            cmd.append(f'--use_cuda={self.cuda}')
         
         # Add server_ip if it exists
         if self.server_ip is not None:
