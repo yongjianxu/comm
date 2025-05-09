@@ -9,7 +9,7 @@ ibdevs = ['mlx5_1']
 ports = [6667]
 # Check if hostname is in client or server list
 if hostname in clients: 
-    for i in range(len(ibdevs)):
+    for i in range(len(ibdevs) + 1):
         ibdev = ibdevs[i % len(ibdevs)]  # Alternate between mlx5_0 and mlx5_1
         port = ports[i % len(ports)]      # Alternate between ports
         server = servers[i % len(servers)]
