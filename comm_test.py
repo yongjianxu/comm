@@ -1,6 +1,7 @@
 from write import WRITE
 import sys
-hostname = sys.gethostname()
+import socket
+hostname = socket.gethostname()
 # Define client and server hostnames
 clients = ['hgx-isr1-111']
 servers = ['hgx-isr1-112']
