@@ -3,8 +3,8 @@ import sys
 import socket
 hostname = socket.gethostname()
 # Test config
-clients = ['hgx-isr1-111']
-servers = ['hgx-isr1-112']
+clients = ['host1']
+servers = ['host2']
 # make sure ibdevs and cudevs matches in locality
 ibdevs = ['mlx5_0','mlx5_3','mlx5_4','mlx5_5','mlx5_6','mlx5_9','mlx5_10','mlx5_11']
 cudevs = [0,1,2,3,4,5,6,7]
