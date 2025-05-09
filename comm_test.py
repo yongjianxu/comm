@@ -5,8 +5,8 @@ hostname = socket.gethostname()
 # Define client and server hostnames
 clients = ['hgx-isr1-111']
 servers = ['hgx-isr1-112']
-ibdevs = ['mlx5_0', 'mlx5_1']
-ports = [6666, 6667]
+ibdevs = ['mlx5_1']
+ports = [6667]
 # Check if hostname is in client or server list
 if hostname in clients: 
     for i in range(len(ibdevs)):
