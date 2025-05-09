@@ -64,7 +64,7 @@ class WRITE:
             
             # Create a unique filename based on timestamp and device
             timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_file = f"ib_write_bw_{self.ibdev}_{timestamp}.log"
+            output_file = f"results/ib_write_bw_{self.ibdev}_{timestamp}.log"
             
             # Open file to capture output
             with open(output_file, 'w') as f:
