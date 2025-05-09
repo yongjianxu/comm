@@ -2,7 +2,7 @@ import subprocess
 import logging
 
 class WRITE:
-    def __init__(self,ibdev, server_ip, port=18515, size=65536, iterations=1000):
+    def __init__(self,ibdev, server_ip=None, port=18515, size=65536, iterations=1000):
         """
         Initialize WRITE class with ib_write_bw parameters
         
@@ -35,10 +35,13 @@ class WRITE:
             '-p', str(self.port),
             '-s', str(self.size),
             '-n', str(self.iterations),
-            '--report_gbits -F -D 10',
-            self.server_ip
+            '--report_gbits',
+            '-F',
+            '-D', '10',
         ]
-        
+        # Add server_ip if it exists
+        if self.server_ip is not None:
+            cmd.append(self.server_ip)
         # Add any additional arguments
         for key, value in kwargs.items():
             if isinstance(value, bool):
@@ -49,9 +52,14 @@ class WRITE:
         
         try:
             self.logger.info(f"Running command: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            return result
+            # Run the process in the background
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            return process
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error running ib_write_bw: {e}")
-            self.logger.error(f"Command output: {e.output}")
             raise
