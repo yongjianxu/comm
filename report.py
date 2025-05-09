@@ -20,3 +20,4 @@ def report_write():
                     print(line.rstrip())
         except Exception as e:
             print(f"Error reading file {file_path}: {e}")
+report_write()
