@@ -52,28 +52,30 @@ class WRITE:
         
         try:
             self.logger.info(f"Running command: {' '.join(cmd)}")
-            # Run the process and print output
+            # Run the process the background
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
-                bufsize=1
             )
 
-            # Print output in real-time
-            while True:
-                output = process.stdout.readline()
-                error = process.stderr.readline()
-                
-                if output:
-                    print(output.strip())
-                if error:
-                    print(error.strip(), file=sys.stderr)
+            # Start a thread to monitor the process and print last 5 lines when it exits
+            def monitor_output(process):
+                stdout, stderr = process.communicate()
+                if stdout:
+                    last_lines = stdout.strip().split('\n')[-5:]
+                    print(f"\nLast 5 lines of output from {' '.join(cmd)}:")
+                    for line in last_lines:
+                        print(line)
+                if stderr:
+                    print(f"\nErrors from {' '.join(cmd)}:", file=sys.stderr)
+                    print(stderr, file=sys.stderr)
                     
-                # Break if process has finished and no more output
-                if process.poll() is not None and not output and not error:
-                    break
+            thread = threading.Thread(target=monitor_output, args=(process,))
+            thread.daemon = True
+            thread.start()
+            
             return process
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error running ib_write_bw: {e}")
