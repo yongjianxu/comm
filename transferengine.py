@@ -96,7 +96,7 @@ class TRANSFERENGINE:
             cmd = [
                 'transfer_engine_bench',
                 f'--metadata_server={self.meta_server}:{ETCD_PORT}',
-                f'--local_server={self.local_server}:{DEFAULT_PORT}',
+                f'--local_server_name={self.local_server}:{DEFAULT_PORT}',
                 f'--device_name={self.dev}',
                 f'-use_vram={str(self.vram).lower()}',
                 f'-operation={self.op}',
