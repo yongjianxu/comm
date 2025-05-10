@@ -4,6 +4,8 @@ import time
 import socket
 from typing import Optional, List
 import sys
+import subprocess
+import signal
 
 # Configuration constants
 DEFAULT_BLOCK_SIZE = 512 * 8192
@@ -64,6 +66,8 @@ class TRANSFERENGINE:
             raise ValueError("dev is required")
         if mode not in [None, 'target']:
             raise ValueError("mode must be either None or 'target'")
+        if op not in ['read', 'write']:
+            raise ValueError("op must be either 'read' or 'write'")
 
         self.mode = mode
         self.meta_server = meta_server
@@ -77,106 +81,69 @@ class TRANSFERENGINE:
         self.gpuid = gpuid
         self.segid = segid
         self.logger = logging.getLogger(__name__)
-                    
-    def etcd_start(self):
-        """
-        Start the etcd server process
-        """
-        try:
-            cmd = [
-                'etcd',
-                f'--listen-client-urls=http://{self.meta_server}:2379',
-                f'--advertise-client-urls=http://{self.meta_server}:12345'
-            ]
-            
-            self.logger.info("Running etcd server in background")
-            
-            # Set stdout and stderr to PIPE to prevent output from blocking
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                start_new_session=True  # This creates a new session, detaching from parent
-            )
-            # Wait for 10 seconds to let etcd server start
-            time.sleep(10)
-            
-            # Check if etcd server is running properly
-            try:
-                check_cmd = ["curl", f"http://{self.meta_server}:2379/version"]
-                result = subprocess.run(check_cmd, capture_output=True, text=True)
-                
-                # Check if the response contains expected version information
-                if '"etcdserver":"3.' in result.stdout and '"etcdcluster":"3.' in result.stdout:
-                    self.logger.info("etcd server started successfully")
-                else:
-                    self.logger.warning(f"etcd server may not have started correctly. Response: {result.stdout}")
-            except Exception as e:
-                self.logger.warning(f"Failed to verify etcd server status: {e}")
-            return process
-            
-        except Exception as e:
-            self.logger.error(f"Failed to start etcd server: {e}")
-            raise
-
+        self.process = None
 
     def transfer_start(self):
         """
         Start the transfer engine benchmark process
+        
+        Returns:
+            subprocess.Popen: The started process
+            
+        Raises:
+            RuntimeError: If the process fails to start or encounters an error
         """
         try:
             cmd = [
                 'transfer_engine_bench',
                 f'--mode={self.mode}',
-                f'--metadata_server={self.meta_server}:2379',
-                f'--local_server={self.local_server}:12345',
+                f'--metadata_server={self.meta_server}:{ETCD_PORT}',
+                f'--local_server={self.local_server}:{DEFAULT_PORT}',
                 f'--device_name={self.dev}',
-                f'-use_vram={self.vram}',
+                f'-use_vram={str(self.vram).lower()}',
                 f'-operation={self.op}',
-                f'-protocol={self.protocol}',
                 f'-block_size={self.block_size}',
                 f'-batch_size={self.batch_size}',
                 f'-buffer_size={self.buffer_size}'
             ]
             
-            
             if self.gpuid is not None:
                 cmd.append(f'-gpu_id={self.gpuid}')
-            
-            if self.mode is not None:
-                cmd.append(f'-gpu_id={self.mode}')
             
             if self.segid is not None:
                 cmd.append(f'--segment_id={self.segid}')
 
-
             self.logger.info(f"Starting transfer engine benchmark: {' '.join(cmd)}")
-            import random
-            random_num = random.randint(1000, 9999)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_file = f"transfer_engine_{timestamp}_{random_num}.log"
-            # Run the transfer engine benchmark process and redirect both stdout and stderr to file
-            with open(output_file, 'w') as f:
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=f,
-                    stderr=f  # Redirect stderr to the same file
-                )
             
-            self.logger.info(f"Transfer engine benchmark output (stdout and stderr) is being written to {output_file}")
-            # Write the command to the beginning of the output file
-            with open(output_file, 'r') as f:
-                content = f.read()
+            # Create unique log file name
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            output_file = f"transfer_engine_{timestamp}_{self.gpuid}.log"
             
+            # Run the transfer engine benchmark process
             with open(output_file, 'w') as f:
                 f.write(f"Command: {' '.join(cmd)}\n\n")
-                f.write(content)
-                        
-            return process
+                self.process = subprocess.Popen(
+                    cmd,
+                    stdout=f,
+                    stderr=f,
+                    start_new_session=True
+                )
+            
+            self.logger.info(f"Transfer engine benchmark output is being written to {output_file}")
+            return self.process
             
         except Exception as e:
             self.logger.error(f"Failed to start transfer engine benchmark: {e}")
-            raise
+            raise RuntimeError(f"Failed to start transfer engine: {e}")
+
+    def cleanup(self):
+        """Clean up the transfer engine process"""
+        if self.process and self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
 
 def vram_transfer(mode: Optional[str] = None, 
                  block_size: int = DEFAULT_BLOCK_SIZE, 
@@ -189,12 +156,12 @@ def vram_transfer(mode: Optional[str] = None,
         block_size (int): Size of each transfer block in bytes
         batch_size (int): Number of blocks per batch
     
-    Uses the global gpus and devs lists to determine how many instances to create.
-    Starts etcd server once and then creates transfer instances for each GPU.
-    Starts all transfer_start processes simultaneously.
-    
     Returns:
         List[subprocess.Popen]: List of transfer engine processes
+        
+    Raises:
+        ValueError: If GPU and device counts don't match
+        RuntimeError: If transfer engine creation or start fails
     """
     processes = []
     instances = []
@@ -202,26 +169,9 @@ def vram_transfer(mode: Optional[str] = None,
     if len(gpus) != len(devs):
         raise ValueError(f"Number of GPUs ({len(gpus)}) does not match number of devices ({len(devs)})")
     
-    # Create first instance and start etcd server only once
-    if len(gpus) > 0:
-        first_engine = TRANSFERENGINE(
-            mode=mode if mode == 'target' else None,
-            meta_server=meta_ip,
-            local_server=local_ip,
-            dev=devs[0],
-            vram=True,
-            gpuid=gpus[0],
-            block_size=block_size,
-            batch_size=batch_size,
-            segid=f"{target_ip}:{DEFAULT_PORT}" if mode is None else None
-        )
-        
-        # Start etcd server once
-        first_engine.etcd_start()
-        instances.append(first_engine)
-        
-        # Create remaining instances
-        for i, gpu_id in enumerate(gpus[1:], 1):
+    try:
+        # Create instances for all GPUs
+        for i, gpu_id in enumerate(gpus):
             try:
                 transfer_engine = TRANSFERENGINE(
                     mode=mode if mode == 'target' else None,
@@ -237,16 +187,33 @@ def vram_transfer(mode: Optional[str] = None,
                 instances.append(transfer_engine)
             except Exception as e:
                 logging.error(f"Failed to create TRANSFERENGINE for GPU {gpu_id}: {e}")
-    
-    # Start all transfer processes simultaneously
-    for instance in instances:
-        try:
-            process = instance.transfer_start()
-            processes.append(process)
-        except Exception as e:
-            logging.error(f"Failed to start transfer for GPU {instance.gpuid}: {e}")
-    
-    return processes
+                raise RuntimeError(f"Failed to create transfer engine: {e}")
+        
+        # Start all transfer processes
+        for instance in instances:
+            try:
+                process = instance.transfer_start()
+                processes.append(process)
+            except Exception as e:
+                logging.error(f"Failed to start transfer for GPU {instance.gpuid}: {e}")
+                # Clean up already started processes
+                for p in processes:
+                    if p and p.poll() is None:
+                        p.terminate()
+                raise RuntimeError(f"Failed to start transfer: {e}")
+        
+        return processes
+        
+    except Exception as e:
+        # Clean up all instances in case of error
+        for instance in instances:
+            instance.cleanup()
+        raise
+
+def signal_handler(signum, frame):
+    """Handle termination signals"""
+    logging.info("Received termination signal. Cleaning up...")
+    sys.exit(0)
 
 if __name__ == "__main__":
     # Configure logging
@@ -255,17 +222,25 @@ if __name__ == "__main__":
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
+    # Set up signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     hostname = socket.gethostname()
     
-    # Check if the current hostname is in the target_host list
-    if hostname in target_host:
-        for batch_size in DEFAULT_BATCH_SIZES:
-            vram_transfer(mode='target', block_size=DEFAULT_BLOCK_SIZE, batch_size=batch_size)
-    elif hostname in client_host:
-        for batch_size in DEFAULT_BATCH_SIZES:
-            vram_transfer(mode=None, block_size=DEFAULT_BLOCK_SIZE, batch_size=batch_size)
-    else:
-        logging.error(f"Unexpected hostname: {hostname}")
+    try:
+        # Check if the current hostname is in the target_host list
+        if hostname in target_host:
+            for batch_size in DEFAULT_BATCH_SIZES:
+                vram_transfer(mode='target', block_size=DEFAULT_BLOCK_SIZE, batch_size=batch_size)
+        elif hostname in client_host:
+            for batch_size in DEFAULT_BATCH_SIZES:
+                vram_transfer(mode=None, block_size=DEFAULT_BLOCK_SIZE, batch_size=batch_size)
+        else:
+            logging.error(f"Unexpected hostname: {hostname}")
+            sys.exit(1)
+    except Exception as e:
+        logging.error(f"Error during transfer: {e}")
         sys.exit(1)
 
     
