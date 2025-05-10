@@ -116,7 +116,7 @@ class TRANSFERENGINE:
             
             # Create unique log file name
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            output_file = f"transfer_engine_{timestamp}_{self.gpuid}.log"
+            output_file = f"results/transfer_engine_{timestamp}_{self.gpuid}.log"
             
             # Run the transfer engine benchmark process
             with open(output_file, 'w') as f:
