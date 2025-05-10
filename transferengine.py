@@ -9,13 +9,13 @@ import signal
 # Configuration constants
 DEFAULT_BLOCK_SIZE = 512 * 8192
 DEFAULT_BATCH_SIZES = [10, 100, 1000, 10000]
-DEFAULT_BUFFER_SIZE = 1 * 1024 * 1024 * 1024
-DEFAULT_PORT = 12345
+DEFAULT_BUFFER_SIZE = 5 * 1024 * 1024 * 1024
 ETCD_PORT = 2379
 
 # Global configuration
 gpus = [0, 1, 2, 3, 4, 5, 6, 7]  # Default list of GPUs
 devs = ['mlx5_0','mlx5_3','mlx5_4','mlx5_5','mlx5_6','mlx5_9','mlx5_10','mlx5_11']
+ports = [12345,12346,12347,12348,12349,12350,12351,12352]
 target_host = ['hgx-isr1-111']
 client_host = ['hgx-isr1-112']
 
@@ -29,6 +29,7 @@ class TRANSFERENGINE:
                  mode: Optional[str] = None,
                  meta_server: str = None,
                  local_server: str = None,
+                 local_port: str = None,
                  dev: str = None,
                  vram: bool = False,
                  gpuid: Optional[int] = None,
@@ -71,6 +72,7 @@ class TRANSFERENGINE:
         self.mode = mode
         self.meta_server = meta_server
         self.local_server = local_server
+        self.local_port = local_port
         self.dev = dev
         self.vram = vram
         self.op = op
@@ -96,7 +98,7 @@ class TRANSFERENGINE:
             cmd = [
                 'transfer_engine_bench',
                 f'--metadata_server={self.meta_server}:{ETCD_PORT}',
-                f'--local_server_name={self.local_server}:{DEFAULT_PORT}',
+                f'--local_server_name={self.local_server}:{self.local_port}',
                 f'--device_name={self.dev}',
                 f'-use_vram={str(self.vram).lower()}',
                 f'-operation={self.op}',
@@ -176,12 +178,13 @@ def vram_transfer(mode: Optional[str] = None,
                     mode=mode if mode == 'target' else None,
                     meta_server=meta_ip,
                     local_server=local_ip,
+                    local_port=port[i],
                     dev=devs[i],
                     vram=True,
                     gpuid=gpu_id,
                     block_size=block_size,
                     batch_size=batch_size,
-                    segid=f"{target_ip}:{DEFAULT_PORT}" if mode is None else None
+                    segid=f"{target_ip}:{port[i]}" if mode is None else None
                 )
                 instances.append(transfer_engine)
             except Exception as e:
