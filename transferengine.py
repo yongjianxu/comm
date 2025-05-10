@@ -17,8 +17,8 @@ ETCD_PORT = 2379
 # Global configuration
 gpus = [0, 1, 2, 3, 4, 5, 6, 7]  # Default list of GPUs
 devs = ['mlx5_0','mlx5_3','mlx5_4','mlx5_5','mlx5_6','mlx5_9','mlx5_10','mlx5_11']
-target_host = ['hgx-isr1-112']
-client_host = ['hgx-isr1-111']
+target_host = ['hgx-isr1-111']
+client_host = ['hgx-isr1-112']
 
 # Network configuration
 local_ip = socket.gethostname()
