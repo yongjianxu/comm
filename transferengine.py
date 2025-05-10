@@ -22,7 +22,7 @@ client_host = ['hgx-isr1-112']
 # Network configuration
 local_ip = socket.gethostname()
 target_ip = target_host[0]
-meta_ip = client_host[0]
+meta_ip = target_host[0]
 
 class TRANSFERENGINE:
     def __init__(self, 
