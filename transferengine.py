@@ -221,7 +221,7 @@ if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format='%(levelname)s: %(message)s'
     )
     
     # Set up signal handlers
