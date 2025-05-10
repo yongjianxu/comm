@@ -96,7 +96,6 @@ class TRANSFERENGINE:
         try:
             cmd = [
                 'transfer_engine_bench',
-                f'--mode={self.mode}',
                 f'--metadata_server={self.meta_server}:{ETCD_PORT}',
                 f'--local_server={self.local_server}:{DEFAULT_PORT}',
                 f'--device_name={self.dev}',
@@ -109,7 +108,8 @@ class TRANSFERENGINE:
             
             if self.gpuid is not None:
                 cmd.append(f'-gpu_id={self.gpuid}')
-            
+            if self.mode is not None:
+                cmd.append(f'-mode={self.mode}')
             if self.segid is not None:
                 cmd.append(f'--segment_id={self.segid}')
 
