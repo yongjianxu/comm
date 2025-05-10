@@ -1,4 +1,3 @@
-import etcd3
 import logging
 import time
 import socket
